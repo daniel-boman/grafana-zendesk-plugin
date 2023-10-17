@@ -6,7 +6,7 @@ import "time"
 type apiSearchResults struct {
 	TicketResults []apiTicket `json:"results"`
 	Facets        any         `json:"facets"`
-	NextPage      any         `json:"next_page"`
+	NextPage      *string     `json:"next_page"`
 	PreviousPage  any         `json:"previous_page"`
 	Count         int         `json:"count"`
 }

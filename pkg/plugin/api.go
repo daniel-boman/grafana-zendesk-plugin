@@ -45,20 +45,22 @@ func (a api) FetchTickets(ctx context.Context, query backend.DataQuery) ([]apiTi
 	p := url.Values{}
 	p.Add("query", q.QueryString)
 	p.Add("sort_by", "updated_at")
+	p.Add("per_page", "100")
 
-	return a.query(ctx, q, p)
+	return a.query(ctx, q, p, 1, []apiTicket{})
 }
 
-func (a api) query(ctx context.Context, query apiQuery, params url.Values) ([]apiTicket, error) {
-	serchEndpoint, err := url.JoinPath(a.Settings.URL, "search")
+func (a api) query(ctx context.Context, query apiQuery, params url.Values, page int, allTickets []apiTicket) ([]apiTicket, error) {
+	searchEndpoint, err := url.JoinPath(a.Settings.URL, "search")
 	if err != nil {
 		return []apiTicket{}, fmt.Errorf("err forming url: %w", err)
 	}
-	req, err := a.buildRequest(ctx, http.MethodGet, serchEndpoint)
+	req, err := a.buildRequest(ctx, http.MethodGet, searchEndpoint)
 	if err != nil {
 		return []apiTicket{}, fmt.Errorf("err building req: %w", err)
 	}
 
+	params.Set("page", fmt.Sprintf("%d", page))
 	req.URL.RawQuery = params.Encode()
 	resp, err := a.Client.Do(req)
 	if err != nil {
@@ -69,8 +71,13 @@ func (a api) query(ctx context.Context, query apiQuery, params url.Values) ([]ap
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return []apiTicket{}, fmt.Errorf("%w: decode: %s", errRemoteRequest, err)
 	}
+	allTickets = append(allTickets, body.TicketResults...)
 
-	return body.TicketResults, nil
+	if body.NextPage != nil {
+		return a.query(ctx, query, params, page+1, allTickets)
+	}
+
+	return allTickets, nil
 }
 
 func (a api) FetchTicketFields(ctx context.Context) ([]byte, error) {
